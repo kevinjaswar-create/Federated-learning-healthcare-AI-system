@@ -1,0 +1,6 @@
+{
+  "name": "Federated Learning Healthcare AI",
+  "description": "Privacy-preserving collaborative federated learning platform for multi-hospital disease prediction using FedAvg.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

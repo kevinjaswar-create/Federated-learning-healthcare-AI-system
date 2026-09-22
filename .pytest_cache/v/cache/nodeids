@@ -1,0 +1,12 @@
+[
+  "backend/app/tests/test_fl_system.py::test_auth_login_api",
+  "backend/app/tests/test_fl_system.py::test_differential_privacy_noise",
+  "backend/app/tests/test_fl_system.py::test_fedavg_mathematical_aggregation",
+  "backend/app/tests/test_fl_system.py::test_federated_status_api",
+  "backend/app/tests/test_fl_system.py::test_health_endpoint",
+  "backend/app/tests/test_fl_system.py::test_jwt_token_generation",
+  "backend/app/tests/test_fl_system.py::test_linear_disease_classifier_local_fit",
+  "backend/app/tests/test_fl_system.py::test_password_hashing",
+  "backend/app/tests/test_fl_system.py::test_prediction_api",
+  "backend/app/tests/test_fl_system.py::test_update_checksum_integrity"
+]

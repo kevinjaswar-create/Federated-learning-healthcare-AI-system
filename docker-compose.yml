@@ -1,0 +1,131 @@
+version: '3.8'
+
+services:
+  # -------------------------------------------------------------
+  # PostgreSQL Database Service
+  # -------------------------------------------------------------
+  postgres:
+    image: postgres:16-alpine
+    container_name: federated-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: federated_health
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d federated_health"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - federated_network
+
+  # -------------------------------------------------------------
+  # Central Federated Coordinator & Web Application (Frontend + Backend)
+  # -------------------------------------------------------------
+  federated-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: federated-coordinator-server
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      PORT: 3000
+      NODE_ENV: development
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/federated_health
+      JWT_SECRET: super-secret-healthcare-federated-key-2026
+      CORS_ORIGIN: "*"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./data:/app/data
+    networks:
+      - federated_network
+    command: npm run dev
+
+  # -------------------------------------------------------------
+  # Hospital Client Edge Node #1: Metropolitan General Hospital
+  # -------------------------------------------------------------
+  hospital-client-1:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: hospital-client-metro-01
+    restart: unless-stopped
+    environment:
+      FEDERATED_SERVER_URL: http://federated-server:3000
+      HOSPITAL_ID: 1
+      HOSPITAL_NAME: Metropolitan General Hospital
+      DP_EPSILON: 1.5
+      DP_CLIP_NORM: 1.0
+      HEARTBEAT_INTERVAL_MS: 15000
+    depends_on:
+      - federated-server
+    volumes:
+      - ./data:/app/data
+    networks:
+      - federated_network
+    command: npx tsx scripts/hospital_worker.ts
+
+  # -------------------------------------------------------------
+  # Hospital Client Edge Node #2: St. Jude Cardiac Institute
+  # -------------------------------------------------------------
+  hospital-client-2:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: hospital-client-stjude-02
+    restart: unless-stopped
+    environment:
+      FEDERATED_SERVER_URL: http://federated-server:3000
+      HOSPITAL_ID: 2
+      HOSPITAL_NAME: St. Jude Cardiac Institute
+      DP_EPSILON: 1.2
+      DP_CLIP_NORM: 1.0
+      HEARTBEAT_INTERVAL_MS: 15000
+    depends_on:
+      - federated-server
+    volumes:
+      - ./data:/app/data
+    networks:
+      - federated_network
+    command: npx tsx scripts/hospital_worker.ts
+
+  # -------------------------------------------------------------
+  # Hospital Client Edge Node #3: Rural Health Network Care
+  # -------------------------------------------------------------
+  hospital-client-3:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: hospital-client-rural-03
+    restart: unless-stopped
+    environment:
+      FEDERATED_SERVER_URL: http://federated-server:3000
+      HOSPITAL_ID: 3
+      HOSPITAL_NAME: Rural Health Network Care
+      DP_EPSILON: 2.0
+      DP_CLIP_NORM: 1.0
+      HEARTBEAT_INTERVAL_MS: 15000
+    depends_on:
+      - federated-server
+    volumes:
+      - ./data:/app/data
+    networks:
+      - federated_network
+    command: npx tsx scripts/hospital_worker.ts
+
+networks:
+  federated_network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+    driver: local
