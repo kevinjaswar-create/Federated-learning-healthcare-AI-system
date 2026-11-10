@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
+import { DatasetAnalyzer } from '../fl/datasetAnalyzer';
 
 export interface UserEntity {
   id: number;
@@ -36,6 +37,18 @@ export interface DatasetEntity {
   feature_count: number;
   status: string;
   file_path?: string;
+  file_name?: string;
+  file_size?: number;
+  columns?: string[];
+  column_types?: Record<string, 'numeric' | 'categorical'>;
+  preview_rows?: Record<string, any>[];
+  missing_values_count?: number;
+  missing_per_column?: Record<string, number>;
+  duplicate_count?: number;
+  summaries?: Record<string, any>;
+  target_candidates?: any[];
+  data_quality?: any;
+  trained_model?: any;
   schema_info?: {
     features?: string[];
     target?: string;
@@ -507,22 +520,32 @@ class Store {
       if (fs.existsSync(csvPath)) {
         try {
           const content = fs.readFileSync(csvPath, 'utf-8');
-          const lines = content.trim().split('\n');
+          const stat = fs.statSync(csvPath);
+          const parsed = DatasetAnalyzer.parseCsv(content);
+          const analysis = DatasetAnalyzer.analyze(parsed, 20);
+
           const samples: ClinicalSample[] = [];
           let positiveCount = 0;
           let negativeCount = 0;
 
-          for (let i = 1; i < lines.length; i++) {
-            const line = lines[i].trim();
-            if (!line) continue;
-            const parts = line.split(',').map(Number);
-            if (parts.length >= 11) {
-              const features = parts.slice(0, 10);
-              const target = parts[10];
-              samples.push({ features, target });
-              if (target === 1) positiveCount++;
-              else negativeCount++;
-            }
+          for (const row of parsed.rows) {
+            const rawTarget = row['target'];
+            const targetNum = rawTarget !== undefined ? Number(rawTarget) : 0;
+            const features = [
+              Number(row['age']) || 55,
+              Number(row['sex']) || 1,
+              Number(row['chest_pain_type']) || 1,
+              Number(row['resting_bp']) || 130,
+              Number(row['cholesterol']) || 240,
+              Number(row['fasting_blood_sugar']) || 0,
+              Number(row['resting_ecg']) || 0,
+              Number(row['max_heart_rate']) || 150,
+              Number(row['exercise_angina']) || 0,
+              Number(row['st_depression']) || 1.0,
+            ];
+            samples.push({ features, target: targetNum });
+            if (targetNum === 1) positiveCount++;
+            else negativeCount++;
           }
 
           this.hospitalData.set(hosp.id, samples);
@@ -534,26 +557,25 @@ class Store {
             hospital_name: hosp.hospital_name,
             dataset_name: `${hosp.hospital_name} - Patient Cohort (Non-IID)`,
             record_count: samples.length,
-            feature_count: 10,
+            feature_count: analysis.feature_count,
             status: 'PREPROCESSED',
             file_path: csvPath,
+            file_name: 'dataset.csv',
+            file_size: stat.size,
+            columns: analysis.columns,
+            column_types: analysis.column_types,
+            preview_rows: analysis.preview_rows,
+            missing_values_count: analysis.data_quality.missing_cells,
+            duplicate_count: analysis.data_quality.duplicate_rows,
+            summaries: analysis.summaries,
+            target_candidates: analysis.target_candidates,
+            data_quality: analysis.data_quality,
             schema_info: {
-              features: [
-                'age',
-                'sex',
-                'chest_pain_type',
-                'resting_bp',
-                'cholesterol',
-                'fasting_blood_sugar',
-                'resting_ecg',
-                'max_heart_rate',
-                'exercise_angina',
-                'st_depression',
-              ],
+              features: analysis.columns.filter((c) => c !== 'target'),
               target: 'target',
               positive_class_count: positiveCount,
               negative_class_count: negativeCount,
-              missing_values: 0,
+              missing_values: analysis.data_quality.missing_cells,
               non_iid_bias: `Hospital node ${hosp.id} partition`,
             },
             uploaded_at: hosp.created_at,

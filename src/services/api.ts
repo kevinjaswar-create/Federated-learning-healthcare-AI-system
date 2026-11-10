@@ -183,6 +183,45 @@ export const api = {
     return handleResponse<Dataset>(res);
   },
 
+  async trainDatasetModel(
+    id: number,
+    config: {
+      target_column?: string;
+      feature_columns?: string[];
+      epochs?: number;
+      learning_rate?: number;
+      batch_size?: number;
+      l2_reg?: number;
+      train_split?: number;
+    }
+  ): Promise<{ status: string; dataset_id: number; trained_model: any }> {
+    const res = await fetch(`${API_BASE}/datasets/${id}/train`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(config),
+    });
+    return handleResponse<{ status: string; dataset_id: number; trained_model: any }>(res);
+  },
+
+  async predictDatasetSample(
+    id: number,
+    features: Record<string, any>
+  ): Promise<{
+    probability_risk: number;
+    risk_tier: 'LOW_RISK' | 'MODERATE_RISK' | 'HIGH_RISK';
+    prediction_label: string;
+    target_class_1_label: string;
+    target_class_0_label: string;
+    top_risk_factors: { feature: string; contribution: number; direction: string }[];
+  }> {
+    const res = await fetch(`${API_BASE}/datasets/${id}/predict`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ features }),
+    });
+    return handleResponse<any>(res);
+  },
+
   // Local Training
   async startLocalTraining(params: {
     hospital_id: number;

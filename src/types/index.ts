@@ -44,6 +44,86 @@ export interface Hospital {
   latest_accuracy: number | null;
 }
 
+export interface ColumnSummary {
+  name: string;
+  dtype: 'numeric' | 'categorical';
+  count: number;
+  missing_count: number;
+  missing_percentage: number;
+  unique_count: number;
+  mean?: number;
+  std?: number;
+  min?: number;
+  p25?: number;
+  median?: number;
+  p75?: number;
+  max?: number;
+  top_values?: { value: string; count: number; percentage: number }[];
+}
+
+export interface TargetCandidate {
+  column: string;
+  unique_classes: (string | number)[];
+  class_counts: Record<string, number>;
+  is_binary: boolean;
+  recommended: boolean;
+}
+
+export interface DataQualityReport {
+  completeness_percentage: number;
+  cleanliness_percentage: number;
+  health_score: number;
+  total_cells: number;
+  missing_cells: number;
+  duplicate_rows: number;
+  readiness_status: 'READY' | 'WARNINGS' | 'ACTION_REQUIRED';
+  issues: string[];
+  recommendations: string[];
+}
+
+export interface TrainedModelResult {
+  target_column: string;
+  target_classes: { original: string | number; encoded: number }[];
+  feature_columns: string[];
+  feature_scalers: Record<string, { mean: number; std: number; median?: number }>;
+  categorical_encodings: Record<string, Record<string, number>>;
+  weights: Record<string, number>;
+  weight_vector: number[];
+  bias: number;
+  metrics: {
+    accuracy: number;
+    precision: number;
+    recall: number;
+    specificity: number;
+    f1_score: number;
+    roc_auc: number;
+    loss: number;
+    train_count: number;
+    test_count: number;
+    epoch_losses: number[];
+    confusion_matrix: {
+      matrix: number[][];
+      true_negatives: number;
+      false_positives: number;
+      false_negatives: number;
+      true_positives: number;
+    };
+    sample_predictions: {
+      actual: number;
+      predicted: number;
+      probability: number;
+      features: Record<string, any>;
+    }[];
+  };
+  feature_importances: {
+    feature: string;
+    weight: number;
+    abs_weight: number;
+    impact: 'INCREASES_RISK' | 'DECREASES_RISK';
+  }[];
+  trained_at: string;
+}
+
 export interface Dataset {
   id: number;
   hospital_id: number;
@@ -52,6 +132,17 @@ export interface Dataset {
   record_count: number;
   feature_count: number;
   status: string;
+  file_name?: string;
+  file_size?: number;
+  columns?: string[];
+  column_types?: Record<string, 'numeric' | 'categorical'>;
+  preview_rows?: Record<string, any>[];
+  missing_values_count?: number;
+  duplicate_count?: number;
+  summaries?: Record<string, ColumnSummary>;
+  target_candidates?: TargetCandidate[];
+  data_quality?: DataQualityReport;
+  trained_model?: TrainedModelResult;
   schema_info?: {
     features?: string[];
     target?: string;

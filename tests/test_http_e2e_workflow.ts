@@ -88,13 +88,75 @@ async function runHttpTests() {
     assert(hospRes.status === 200, '2.1 GET /api/hospitals returns 200');
     assert(Array.isArray(hospData) && hospData.length >= 5, '2.2 Hospital nodes list returned');
 
-    // 3. Dataset Config Endpoint
+    // 3. Dataset Config and Profiling Endpoints
     const dsCfgRes = await fetch(`${baseUrl}/api/config/dataset`, {
       headers: { Authorization: `Bearer ${adminToken}` },
     });
     const dsCfgData = await dsCfgRes.json();
     assert(dsCfgRes.status === 200, '3.1 GET /api/config/dataset returns 200');
     assert(dsCfgData.feature_columns.length === 10, '3.2 10 clinical feature columns defined in config');
+
+    // 3.3 List datasets and verify preview rows
+    const dsListRes = await fetch(`${baseUrl}/api/datasets`, {
+      headers: { Authorization: `Bearer ${adminToken}` },
+    });
+    const dsListData = await dsListRes.json();
+    assert(dsListRes.status === 200, '3.3 GET /api/datasets returns 200');
+    assert(Array.isArray(dsListData) && dsListData.length > 0, '3.4 Hospital datasets registered');
+
+    // 3.5 Inspect specific dataset with real preview rows and quality score
+    const dsDetailRes = await fetch(`${baseUrl}/api/datasets/1`, {
+      headers: { Authorization: `Bearer ${adminToken}` },
+    });
+    const dsDetail = await dsDetailRes.json();
+    assert(dsDetailRes.status === 200, '3.5 GET /api/datasets/1 returns 200');
+    assert(Array.isArray(dsDetail.preview_rows) && dsDetail.preview_rows.length > 0, '3.6 Dataset preview returns actual CSV rows');
+    assert(dsDetail.data_quality && dsDetail.data_quality.health_score > 50, '3.7 Data quality audit calculated');
+
+    // 3.8 Train Logistic Regression on uploaded dataset
+    const dsTrainRes = await fetch(`${baseUrl}/api/datasets/1/train`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${adminToken}`,
+      },
+      body: JSON.stringify({
+        target_column: 'target',
+        epochs: 15,
+        learning_rate: 0.05,
+      }),
+    });
+    const dsTrainData = await dsTrainRes.json();
+    assert(dsTrainRes.status === 200, '3.8 POST /api/datasets/1/train returns 200');
+    assert(dsTrainData.trained_model.metrics.accuracy > 0.5, `3.9 Dataset Logistic Regression accuracy: ${(dsTrainData.trained_model.metrics.accuracy * 100).toFixed(1)}%`);
+    assert(!!dsTrainData.trained_model.metrics.confusion_matrix, '3.10 Confusion matrix generated for dataset model');
+
+    // 3.11 Inference on dataset trained model
+    const dsPredRes = await fetch(`${baseUrl}/api/datasets/1/predict`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${adminToken}`,
+      },
+      body: JSON.stringify({
+        features: {
+          age: 65,
+          sex: 1,
+          chest_pain_type: 3,
+          resting_bp: 160,
+          cholesterol: 280,
+          fasting_blood_sugar: 1,
+          resting_ecg: 1,
+          max_heart_rate: 110,
+          exercise_angina: 1,
+          st_depression: 2.8,
+        },
+      }),
+    });
+    const dsPredData = await dsPredRes.json();
+    assert(dsPredRes.status === 200, '3.11 POST /api/datasets/1/predict returns 200');
+    assert(dsPredData.probability_risk > 50, `3.12 Disease risk inference calculated: ${dsPredData.probability_risk}% (${dsPredData.risk_tier})`);
+
 
     // 4. Local Training API Endpoint
     const trainRes = await fetch(`${baseUrl}/api/training/local`, {
